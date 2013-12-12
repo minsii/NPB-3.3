@@ -172,6 +172,7 @@ void get_info(int argc, char *argv[], int *typep, int *nprocsp, char *classp,
   else if (!strcmp(argv[1], "ft") || !strcmp(argv[1], "FT")) *typep = FT;
   else if (!strcmp(argv[1], "lu") || !strcmp(argv[1], "LU")) *typep = LU;
   else if (!strcmp(argv[1], "mg") || !strcmp(argv[1], "MG")) *typep = MG;
+  else if (!strcmp(argv[1], "hmg") || !strcmp(argv[1], "MG")) *typep = MG;
   else if (!strcmp(argv[1], "is") || !strcmp(argv[1], "IS")) *typep = IS;
   else if (!strcmp(argv[1], "dt") || !strcmp(argv[1], "DT")) *typep = DT;
   else if (!strcmp(argv[1], "ep") || !strcmp(argv[1], "EP")) *typep = EP;
