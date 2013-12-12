@@ -24,8 +24,8 @@ MG: mg
 mg: header
 	cd MG; $(MAKE) NPROCS=$(NPROCS) CLASS=$(CLASS)
 
-HYBRID-MG: hybrid_mg
-hybrid_mg: header
+HYBRID-MG: hmg
+hmg: header
 	cd HYBRID-MG; $(MAKE) NPROCS=$(NPROCS) CLASS=$(CLASS)
 	
 FT: ft
