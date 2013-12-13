@@ -81,14 +81,14 @@ void c_print_results( char   *name,
     printf( "   MULTICPUS = %s\n", evalue );
 #endif
 
-    printf( "\n\n" );
-    printf( " Please send the results of this run to:\n\n" );
-    printf( " NPB Development Team\n" );
-    printf( " Internet: npb@nas.nasa.gov\n \n" );
-    printf( " If email is not available, send this to:\n\n" );
-    printf( " MS T27A-1\n" );
-    printf( " NASA Ames Research Center\n" );
-    printf( " Moffett Field, CA  94035-1000\n\n" );
-    printf( " Fax: 650-604-3957\n\n" );
+//    printf( "\n\n" );
+//    printf( " Please send the results of this run to:\n\n" );
+//    printf( " NPB Development Team\n" );
+//    printf( " Internet: npb@nas.nasa.gov\n \n" );
+//    printf( " If email is not available, send this to:\n\n" );
+//    printf( " MS T27A-1\n" );
+//    printf( " NASA Ames Research Center\n" );
+//    printf( " Moffett Field, CA  94035-1000\n\n" );
+//    printf( " Fax: 650-604-3957\n\n" );
 }
  

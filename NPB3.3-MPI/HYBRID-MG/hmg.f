@@ -81,6 +81,10 @@ c---------------------------------------------------------------------------c
       integer ierr,i, fstatus
       integer T_bench, T_init
       parameter (T_bench=1, T_init=2)
+      integer tmax, tnum
+
+!$    integer  omp_get_max_threads, omp_get_num_threads
+!$    external omp_get_max_threads, omp_get_num_threads
 
       call mpi_init(ierr)
       call mpi_comm_rank(mpi_comm_world, me, ierr)
@@ -211,9 +215,20 @@ c---------------------------------------------------------------------
 
       call norm2u3(v,n1,n2,n3,rnm2,rnmu,nx(lt),ny(lt),nz(lt))
 
+      tmax = 1
+!$    tmax = omp_get_max_threads()
+      tnum = 1
+!$omp parallel shared(tnum)
+!$omp master
+!       tnum = omp_get_num_threads()
+!$omp end master
+!$omp end parallel
+
       if( me .eq. root )then
          write (*, 1001) nx(lt),ny(lt),nz(lt), Class
          write (*, 1002) nit
+         write (*, 1006) tmax
+         write (*, 1007) tnum
 
  1000 format(//,' NAS Parallel Benchmarks 3.3 -- MG Benchmark', /)
  1001    format(' Size: ', i4, 'x', i4, 'x', i4, '  (class ', A, ')' )
@@ -227,6 +242,8 @@ c---------------------------------------------------------------------
          else
            write (*, 1003) nprocs
          endif
+ 1006    format(' Number of available threads: ', i5)
+ 1007    format(' Number of threads: ', i5)
       endif
 
       call resid(u,v,r,n1,n2,n3,a,k)
@@ -613,7 +630,8 @@ c---------------------------------------------------------------------
       integer i3, i2, i1
 
       double precision r1(m), r2(m)
-      
+
+!$omp parallel do default(shared) private(i1,i2,i3,r1,r2)
       do i3=2,n3-1
          do i2=2,n2-1
             do i1=1,n1
@@ -636,6 +654,7 @@ c---------------------------------------------------------------------
             enddo
          enddo
       enddo
+!$omp end parallel do
 
 c---------------------------------------------------------------------
 c     exchange boundary points
@@ -768,6 +787,8 @@ c---------------------------------------------------------------------
         d3 = 1
       endif
 
+!$omp parallel do default(shared)
+!$omp& private(j1,j2,j3,i1,i2,i3,x1,y1,x2,y2)
       do  j3=2,m3j-1
          i3 = 2*j3-d3
 C        i3 = 2*j3-1
@@ -800,7 +821,7 @@ C             i1 = 2*j1-1
 
          enddo
       enddo
-
+!$omp end parallel do
 
       j = k-1
       call comm3(s,m1j,m2j,m3j,j)
@@ -851,7 +872,7 @@ c      parameter( m=535 )
 
 
       if( n1 .ne. 3 .and. n2 .ne. 3 .and. n3 .ne. 3 ) then
-
+!$omp parallel do default(shared) private(i1,i2,i3,z1,z2,z3)
          do  i3=1,mm3-1
             do  i2=1,mm2-1
 
@@ -887,6 +908,7 @@ c      parameter( m=535 )
                enddo
             enddo
          enddo
+!$omp end parallel do
 
       else
 
@@ -914,6 +936,8 @@ c      parameter( m=535 )
             t3 = 0
          endif
          
+!$omp parallel default(shared) private(i1,i2,i3)
+!$omp do
          do  i3=d3,mm3-1
             do  i2=d2,mm2-1
                do  i1=d1,mm1-1
@@ -937,7 +961,9 @@ c      parameter( m=535 )
                enddo
             enddo
          enddo
+!$omp end do
 
+!$omp do
          do  i3=1,mm3-1
             do  i2=d2,mm2-1
                do  i1=d1,mm1-1
@@ -965,6 +991,8 @@ c      parameter( m=535 )
                enddo
             enddo
          enddo
+!$omp end do nowait
+!$omp end parallel
 
       endif
 
@@ -1013,6 +1041,8 @@ c---------------------------------------------------------------------
 
       s=0.0D0
       rnmu = 0.0D0
+!$omp parallel do default(shared) private(i1,i2,i3,a)
+!$omp& reduction(+:s) reduction(max:rnmu)
       do  i3=2,n3-1
          do  i2=2,n2-1
             do  i1=2,n1-1
@@ -1022,6 +1052,7 @@ c---------------------------------------------------------------------
             enddo
          enddo
       enddo
+!$omp end parallel do
 
       call mpi_allreduce(rnmu,ss,1,dp_type,
      >     mpi_max,mpi_comm_world,ierr)
@@ -2047,6 +2078,10 @@ c---------------------------------------------------------------------
       external randlc
       double precision randlc, rdummy
 
+!$    integer  omp_get_thread_num, omp_get_num_threads
+!$    external omp_get_thread_num, omp_get_num_threads
+      integer myid, num_threads
+
       a1 = power( a, nx, 1, 0 )
       a2 = power( a, nx, ny, 0 )
 
@@ -2061,6 +2096,10 @@ c      i = is1-2+nx*(is2-2+ny*(is3-2))
       e3 = ie3 - is3 + 2
       x0 = x
       rdummy = randlc( x0, ai )
+
+c     cannot parallelized because dependency on x0
+c!$omp parallel do default(shared) private(i2,i3,x1,xx,rdummy)
+c!$omp&  shared(e2,e3,d1,a1,a2) firstprivate(x0)
       do  i3 = 2, e3
          x1 = x0
          do  i2 = 2, e2
@@ -2070,6 +2109,7 @@ c      i = is1-2+nx*(is2-2+ny*(is3-2))
          enddo
          rdummy = randlc( x0, a2 )
       enddo
+c!$omp end parallel do
 
 c---------------------------------------------------------------------
 c       call comm3(z,n1,n2,n3)
@@ -2079,6 +2119,10 @@ c---------------------------------------------------------------------
 c---------------------------------------------------------------------
 c     each processor looks for twenty candidates
 c---------------------------------------------------------------------
+c!$omp parallel default(shared) private(i,i1,i2,i3)
+c!$omp& shared(n1,n2,n3) lastprivate(j1,j2,j3,ten)
+
+c!$omp do
       do  i=1,mm
          ten( i, 1 ) = 0.0D0
          j1( i, 1 ) = 0
@@ -2089,7 +2133,9 @@ c---------------------------------------------------------------------
          j2( i, 0 ) = 0
          j3( i, 0 ) = 0
       enddo
+c!$omp end do
 
+c!$omp do
       do  i3=2,n3-1
          do  i2=2,n2-1
             do  i1=2,n1-1
@@ -2110,6 +2156,8 @@ c---------------------------------------------------------------------
             enddo
          enddo
       enddo
+c!$omp end do
+c!$omp end parallel
 
       call mpi_barrier(mpi_comm_world,ierr)
 
@@ -2169,6 +2217,8 @@ c---------------------------------------------------------------------
          jg( 3, i, 0) =  jg_temp(4)
 
       enddo
+
+
       m1 = i1+1
       m0 = i0+1
 
@@ -2191,6 +2241,8 @@ c 9    format(5(' (',i3,2(',',i3),')'))
 c 8    format(5D15.8)
 c 7    format(10i4)
       call mpi_barrier(mpi_comm_world,ierr)
+
+!$omp parallel do default(shared) private(i1,i2,i3)
       do  i3=1,n3
          do  i2=1,n2
             do  i1=1,n1
@@ -2198,6 +2250,8 @@ c 7    format(10i4)
             enddo
          enddo
       enddo
+!$omp end parallel do
+
       do  i=mm,m0,-1
          z( j1(i,0), j2(i,0), j3(i,0) ) = -1.0D0
       enddo
@@ -2464,6 +2518,7 @@ c---------------------------------------------------------------------
       double precision z(n1,n2,n3)
       integer i1, i2, i3
 
+!$omp parallel do default(shared) private(i1,i2,i3)
       do  i3=1,n3
          do  i2=1,n2
             do  i1=1,n1
@@ -2471,6 +2526,7 @@ c---------------------------------------------------------------------
             enddo
          enddo
       enddo
+!$omp end parallel do
 
       return
       end
