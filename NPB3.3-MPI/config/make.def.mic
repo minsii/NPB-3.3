@@ -46,13 +46,13 @@ FLINK	= $(MPIF77)
 #---------------------------------------------------------------------------
 # Global *compile time* flags for Fortran programs
 #---------------------------------------------------------------------------
-FFLAGS	= -openmp -mmic -mcmodel=medium
+FFLAGS	= -mmic  -mcmodel=medium
 
 #---------------------------------------------------------------------------
 # Global *link time* flags. Flags for increasing maximum executable 
 # size usually go here. 
 #---------------------------------------------------------------------------
-FLINKFLAGS = -openmp -mmic -mcmodel=medium
+FLINKFLAGS = -mmic  -mcmodel=medium
 
 
 #---------------------------------------------------------------------------
@@ -92,13 +92,13 @@ CLINK	= $(MPICC)
 #---------------------------------------------------------------------------
 # Global *compile time* flags for C programs
 #---------------------------------------------------------------------------
-CFLAGS	= -openmp
+CFLAGS	= -mmic 
 
 #---------------------------------------------------------------------------
 # Global *link time* flags. Flags for increasing maximum executable 
 # size usually go here. 
 #---------------------------------------------------------------------------
-CLINKFLAGS = -openmp
+CLINKFLAGS = -mmic
 
 
 #---------------------------------------------------------------------------
