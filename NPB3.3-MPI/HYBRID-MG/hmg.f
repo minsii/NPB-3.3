@@ -121,6 +121,12 @@ c---------------------------------------------------------------------
       if( me .eq. root )then
          write (*, 1000) 
 
+         if (.not. convertdouble) then
+             write(*,*) 'MPI_DOUBLE_PRECISION'
+         else
+             write(*,*) 'MPI_REAL'
+         endif
+
          open(unit=7,file="mg.input", status="old", iostat=fstatus)
          if (fstatus .eq. 0) then
             write(*,50) 
@@ -171,6 +177,8 @@ c---------------------------------------------------------------------
          Class = 'U'
       endif
 
+!      nit = 1
+
 c---------------------------------------------------------------------
 c  Use these for debug info:
 c---------------------------------------------------------------------
@@ -220,7 +228,7 @@ c---------------------------------------------------------------------
       tnum = 1
 !$omp parallel shared(tnum)
 !$omp master
-!       tnum = omp_get_num_threads()
+!$    tnum = omp_get_num_threads()
 !$omp end master
 !$omp end parallel
 
@@ -459,6 +467,12 @@ c---------------------------------------------------------------------
          m1(k) = mi(1,k)
          m2(k) = mi(2,k)
          m3(k) = mi(3,k)
+!#debug
+      if (me. eq. root) then
+        write (*,1) me, k, m1(k), m2(k), m3(k)
+ 1      format('[', i1 , '] k ', i2, ', m[ ', i4, i4, i4, ']')
+      endif
+!#debug end
 
          do  ax=1,3
             idin(ax,+1) = mod( idi(ax) + next(ax) + pi(ax) , pi(ax) )
@@ -624,6 +638,7 @@ c---------------------------------------------------------------------
       implicit none
 
       include 'globals.h'
+      include 'mpinpb.h'
 
       integer n1,n2,n3,k
       double precision u(n1,n2,n3),r(n1,n2,n3),c(0:3)
@@ -656,6 +671,12 @@ c---------------------------------------------------------------------
       enddo
 !$omp end parallel do
 
+!#debug
+!      if (me. eq. root) then
+!        write (*,1) me
+! 1      format('[', i1 , '] psinv')
+!      endif
+!#debug end
 c---------------------------------------------------------------------
 c     exchange boundary points
 c---------------------------------------------------------------------
@@ -695,6 +716,7 @@ c---------------------------------------------------------------------
       implicit none
 
       include 'globals.h'
+      include 'mpinpb.h'
 
       integer n1,n2,n3,k
       double precision u(n1,n2,n3),v(n1,n2,n3),r(n1,n2,n3),a(0:3)
@@ -727,6 +749,12 @@ c---------------------------------------------------------------------
 c---------------------------------------------------------------------
 c     exchange boundary data
 c---------------------------------------------------------------------
+!#debug
+!      if (me. eq. root) then
+!        write (*,1) me
+! 1      format('[', i1 , '] resid')
+!      endif
+!#debug end
       call comm3(r,n1,n2,n3,k)
 
       if( debug_vec(0) .ge. 1 )then
@@ -822,6 +850,13 @@ C             i1 = 2*j1-1
          enddo
       enddo
 !$omp end parallel do
+
+!#debug
+!      if (me. eq. root) then
+!        write (*,1) me
+! 1      format('[', i1 , '] rprj3')
+!      endif
+!#debug end
 
       j = k-1
       call comm3(s,m1j,m2j,m3j,j)
@@ -996,6 +1031,12 @@ c      parameter( m=535 )
 
       endif
 
+!#debug
+!      if (me. eq. root) then
+!        write (*,1) me
+! 1      format('[', i1 , '] interp')
+!      endif
+!#debug end
       call comm3_ex(u,n1,n2,n3,k)
 
       if( debug_vec(0) .ge. 1 )then
@@ -1117,6 +1158,13 @@ c---------------------------------------------------------------------
       double precision u(n1,n2,n3)
       integer axis
 
+!#debug
+!      if (me. eq. root) then
+!        write (*,1) me, n1, n2, n3
+! 1      format('[', i1 , ']comm3: n(',i4, i4, i4, ')')
+!      endif
+!#debug end
+
       if( .not. dead(kk) )then
          do  axis = 1, 3
             if( nprocs .ne. 1) then
@@ -1160,6 +1208,13 @@ c---------------------------------------------------------------------
       double precision u(n1,n2,n3)
       integer axis
 
+!#debug
+!      if (me. eq. root) then
+!        write (*,1) me, n1, n2, n3
+! 1      format('[', i1 , ']comm3_ex: n(',i4, i4, i4, ')')
+!      endif
+!#debug end
+
       do  axis = 1, 3
          if( nprocs .ne. 1 ) then
             if( take_ex( axis, kk ) )then
@@ -1199,6 +1254,7 @@ c---------------------------------------------------------------------
 
       integer axis, dir, k
       integer buff_id,buff_len,i,ierr
+      integer cur_nbr
 
       buff_id = 3 + dir
       buff_len = nm2
@@ -1207,6 +1263,14 @@ c---------------------------------------------------------------------
          buff(i,buff_id) = 0.0D0
       enddo
 
+!#debug
+!      if (me. eq. root) then
+!      cur_nbr = nbr(axis,-dir,k)
+!      write (*,1) me, axis, dir, buff_len, cur_nbr
+! 1    format('ready: [', i2 , '] axis ', i2 , ', dir ', i2 ,
+!     >   ' irecv len ', i8, ' src ', i2)
+!      endif
+!#debug end
 
 c---------------------------------------------------------------------
 c     fake message request type
@@ -1230,6 +1294,7 @@ c---------------------------------------------------------------------
 
 c---------------------------------------------------------------------
 c     give3 sends border data out in the requested direction
+c     data -> comm buffer -> send
 c---------------------------------------------------------------------
       implicit none
 
@@ -1240,9 +1305,23 @@ c---------------------------------------------------------------------
       double precision u( n1, n2, n3 )
 
       integer i3, i2, i1, buff_len,buff_id
+      integer cur_nbr
 
       buff_id = 2 + dir 
       buff_len = 0
+
+!#debug
+!      if (me. eq. root) then
+!        write (*,1) me, n1, n2, n3, axis, dir
+! 1      format('give3: [', i2 , '] n1', i5, ' n2 ', i5, ' n3 ', i5
+!     >   , ' axis ', i2, ' dir ', i2)
+!      endif
+!#debug end
+
+!#debug
+! 1    format('give3: [', i2 , '] axis ', i2 , ', dir ', i2 ,
+!     >   ', kk ', k , ' send len ', i8, ' dest ', i2)
+!#debug end
 
       if( axis .eq.  1 )then
          if( dir .eq. -1 )then
@@ -1253,6 +1332,12 @@ c---------------------------------------------------------------------
                   buff(buff_len,buff_id ) = u( 2,  i2,i3)
                enddo
             enddo
+!#debug
+!      if (me. eq. root) then
+!        cur_nbr = nbr( axis, dir, k )
+!        write (*,1) me, axis, dir, k, buff_len, cur_nbr
+!      endif
+!#debug end
 
             call mpi_send( 
      >           buff(1, buff_id ), buff_len,dp_type,
@@ -1267,6 +1352,12 @@ c---------------------------------------------------------------------
                   buff(buff_len, buff_id ) = u( n1-1, i2,i3)
                enddo
             enddo
+!#debug
+!      if (me. eq. root) then
+!        cur_nbr = nbr( axis, dir, k )
+!        write (*,1) me, axis, dir, k, buff_len, cur_nbr
+!      endif
+!#debug end
 
             call mpi_send( 
      >           buff(1, buff_id ), buff_len,dp_type,
@@ -1285,6 +1376,12 @@ c---------------------------------------------------------------------
                   buff(buff_len, buff_id ) = u( i1,  2,i3)
                enddo
             enddo
+!#debug
+!      if (me. eq. root) then
+!        cur_nbr = nbr( axis, dir, k )
+!        write (*,1) me, axis, dir, k, buff_len, cur_nbr
+!      endif
+!#debug end
 
             call mpi_send( 
      >           buff(1, buff_id ), buff_len,dp_type,
@@ -1299,6 +1396,12 @@ c---------------------------------------------------------------------
                   buff(buff_len,  buff_id )= u( i1,n2-1,i3)
                enddo
             enddo
+!#debug
+!      if (me. eq. root) then
+!        cur_nbr = nbr( axis, dir, k )
+!        write (*,1) me, axis, dir, k, buff_len, cur_nbr
+!      endif
+!#debug end
 
             call mpi_send( 
      >           buff(1, buff_id ), buff_len,dp_type,
@@ -1317,6 +1420,12 @@ c---------------------------------------------------------------------
                   buff(buff_len, buff_id ) = u( i1,i2,2)
                enddo
             enddo
+!#debug
+!      if (me. eq. root) then
+!        cur_nbr = nbr( axis, dir, k )
+!        write (*,1) me, axis, dir, k, buff_len, cur_nbr
+!      endif
+!#debug end
 
             call mpi_send( 
      >           buff(1, buff_id ), buff_len,dp_type,
@@ -1331,6 +1440,12 @@ c---------------------------------------------------------------------
                   buff(buff_len, buff_id ) = u( i1,i2,n3-1)
                enddo
             enddo
+!#debug
+!      if (me. eq. root) then
+!        cur_nbr = nbr( axis, dir, k )
+!        write (*,1) me, axis, dir, k, buff_len, cur_nbr
+!      endif
+!#debug end
 
             call mpi_send( 
      >           buff(1, buff_id ), buff_len,dp_type,
@@ -1353,6 +1468,7 @@ c---------------------------------------------------------------------
 
 c---------------------------------------------------------------------
 c     take3 copies in border data from the requested direction
+c     comm buffer -> border
 c---------------------------------------------------------------------
       implicit none
 
@@ -2258,6 +2374,13 @@ c 7    format(10i4)
       do  i=mm,m1,-1
          z( j1(i,1), j2(i,1), j3(i,1) ) = +1.0D0
       enddo
+
+!#debug
+!      if (me. eq. root) then
+!        write (*,1) me
+! 1      format('[', i1 , '] zran3')
+!      endif
+!#debug end
       call comm3(z,n1,n2,n3,k)
 
 c---------------------------------------------------------------------
