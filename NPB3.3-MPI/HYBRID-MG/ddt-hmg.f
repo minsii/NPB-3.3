@@ -758,10 +758,10 @@ c---------------------------------------------------------------------
 !$omp end parallel do
 
 !#debug
-      if (me. eq. root) then
-        write (*,1) me
- 1      format('[', i1 , '] psinv')
-      endif
+!      if (me. eq. root) then
+!        write (*,1) me
+! 1      format('[', i1 , '] psinv')
+!      endif
 !#debug end
 c---------------------------------------------------------------------
 c     exchange boundary points
@@ -836,10 +836,10 @@ c---------------------------------------------------------------------
 c     exchange boundary data
 c---------------------------------------------------------------------
 !#debug
-      if (me. eq. root) then
-        write (*,1) me
- 1      format('[', i1 , '] resid')
-      endif
+!      if (me. eq. root) then
+!        write (*,1) me
+! 1      format('[', i1 , '] resid')
+!      endif
 !#debug end
       call comm3(r,n1,n2,n3,k)
 
@@ -938,10 +938,10 @@ C             i1 = 2*j1-1
 !$omp end parallel do
 
 !#debug
-      if (me. eq. root) then
-        write (*,1) me
- 1      format('[', i1 , '] rprj3')
-      endif
+!      if (me. eq. root) then
+!        write (*,1) me
+! 1      format('[', i1 , '] rprj3')
+!      endif
 !#debug end
 
       j = k-1
@@ -1118,10 +1118,10 @@ c      parameter( m=535 )
       endif
 
 !#debug
-      if (me. eq. root) then
-        write (*,1) me
- 1      format('[', i1 , '] interp')
-      endif
+!      if (me. eq. root) then
+!        write (*,1) me
+! 1      format('[', i1 , '] interp')
+!      endif
 !#debug end
       call comm3_ex(u,n1,n2,n3,k)
 
@@ -1245,10 +1245,10 @@ c---------------------------------------------------------------------
       integer axis
 
 !#debug
-      if (me. eq. root) then
-        write (*,1) me, n1, n2, n3
- 1      format('[', i1 , ']comm3: n(',i4, i4, i4, ')')
-      endif
+!      if (me. eq. root) then
+!        write (*,1) me, n1, n2, n3
+! 1      format('[', i1 , ']comm3: n(',i4, i4, i4, ')')
+!      endif
 !#debug end
 
       if( .not. dead(kk) )then
@@ -1294,10 +1294,10 @@ c---------------------------------------------------------------------
       integer axis
 
 !#debug
-      if (me. eq. root) then
-        write (*,1) me, n1, n2, n3
- 1      format('[', i1 , ']comm3_ex: n(',i4, i4, i4, ')')
-      endif
+!      if (me. eq. root) then
+!        write (*,1) me, n1, n2, n3
+! 1      format('[', i1 , ']comm3_ex: n(',i4, i4, i4, ')')
+!      endif
 !#debug end
 
       do  axis = 1, 3
@@ -2326,10 +2326,10 @@ c 7    format(10i4)
       enddo
 
 !#debug
-      if (me. eq. root) then
-        write (*,1) me
- 1      format('[', i1 , '] zran3')
-      endif
+!      if (me. eq. root) then
+!        write (*,1) me
+! 1      format('[', i1 , '] zran3')
+!      endif
 !#debug end
       call comm3(z,n1,n2,n3,k)
 
