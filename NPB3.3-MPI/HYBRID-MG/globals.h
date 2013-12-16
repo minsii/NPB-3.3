@@ -50,6 +50,13 @@ c      parameter( m=1037 )
       double precision buff(nm2,4)
       common /buffer/ buff
 
+c---------------------------------------------------------------------
+c  Datatype stuff
+c---------------------------------------------------------------------
+      integer sf_datatype(3, maxlevel), l1_datatype(maxlevel)
+      integer sf_size(3, maxlevel), sizeofdp
+      common /mpiddt/ sf_datatype, l1_datatype, sf_size, sizeofdp
+
 
 
 

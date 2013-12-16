@@ -104,7 +104,7 @@ c---------------------------------------------------------------------------c
       else
          dp_type = MPI_REAL
       endif
-
+      sizeofdp = sizeof(buff(1, 1))
 
       call timer_clear(T_bench)
       call timer_clear(T_init)
@@ -218,6 +218,7 @@ c---------------------------------------------------------------------
       k  = lt
 
       call setup(n1,n2,n3,k)
+      call init_datatype()
       call zero3(u,n1,n2,n3)
       call zran3(v,n1,n2,n3,nx(lt),ny(lt),k)
 
@@ -370,6 +371,7 @@ c---------------------------------------------------------------------
 
       endif
 
+      call free_datatype()
 
       call mpi_finalize(ierr)
       end
@@ -539,6 +541,96 @@ c---------------------------------------------------------------------
       endif
 
       k = lt
+
+      return
+      end
+
+c---------------------------------------------------------------------
+c---------------------------------------------------------------------
+
+      subroutine init_datatype()
+
+c---------------------------------------------------------------------
+c---------------------------------------------------------------------
+      implicit none
+
+      include 'mpinpb.h'
+      include 'globals.h'
+
+      integer ierr, k
+
+      do  k = lt,1,-1
+!# axis 1 (top, bottom)
+!         vector(cnt:y-2, blen:1, stride:x)
+         call mpi_type_vector(m2(k)-2, 1, m1(k), dp_type
+     >    , l1_datatype(k), ierr)
+         call mpi_type_commit(l1_datatype(k), ierr)
+
+!         hvector(cnt:z-2, blen:1, stride:x*y, vector)
+         call mpi_type_hvector(m3(k)-2, 1, m2(k) * m1(k) * sizeofdp
+     >    , l1_datatype(k) , sf_datatype(1, k), ierr)
+         call mpi_type_commit(sf_datatype(1, k), ierr)
+         call mpi_type_size(sf_datatype(1, k), sf_size(1, k)
+     >    , ierr)
+
+
+!# axis 2 (left, right)
+!        vector(cnt:z-2, blen:x, stride:x*y)
+         call mpi_type_vector(m3(k)-2, m1(k), m2(k) * m1(k), dp_type
+     >    , sf_datatype(2, k), ierr)
+         call mpi_type_commit(sf_datatype(2, k), ierr)
+         call mpi_type_size(sf_datatype(2, k), sf_size(2, k)
+     >    , ierr)
+
+!# axis 3 (front, back)
+!         vector(cnt:y, blen:x, stride:x)
+         call mpi_type_vector(m2(k), m1(k), m1(k), dp_type
+     >    , sf_datatype(3, k), ierr)
+         call mpi_type_commit(sf_datatype(3, k), ierr)
+         call mpi_type_size(sf_datatype(3, k), sf_size(3, k)
+     >    , ierr)
+
+!#debug
+!      if (me. eq. root) then
+!        write (*,1) me, k, m1(k), m2(k), m3(k)
+!1       format('[', i1 , '] --init datatype k:', i1, ' m[ ', 3i4, ']')
+!        write (*,2) me, k, sf_size(1, k), sf_size(2, k), sf_size(3, k)
+!2       format('[', i1 , '] --init datatype k:', i1, ' size[ ', 3i7
+!     >          ,']')
+!      endif
+!#debug end
+      enddo
+
+      return
+      end
+
+c---------------------------------------------------------------------
+c---------------------------------------------------------------------
+
+      subroutine free_datatype()
+
+c---------------------------------------------------------------------
+c---------------------------------------------------------------------
+      implicit none
+
+      include 'mpinpb.h'
+      include 'globals.h'
+
+      integer ierr, k
+
+      do  k = lt,1,-1
+!#debug
+!      if (me. eq. root) then
+!        write (*,1) me, k, sf_size(1, k), sf_size(2, k), sf_size(3, k)
+!1       format('[', i1 , '] --free datatype k:', i1, ' size[ ', 3i7
+!     >      ,']')
+!      endif
+!#debug end
+         call mpi_type_free(sf_datatype(1, k), ierr)
+         call mpi_type_free(sf_datatype(2, k), ierr)
+         call mpi_type_free(sf_datatype(3, k), ierr)
+         call mpi_type_free(l1_datatype(k), ierr)
+      enddo
 
       return
       end
@@ -1162,8 +1254,8 @@ c---------------------------------------------------------------------
       if( .not. dead(kk) )then
          do  axis = 1, 3
             if( nprocs .ne. 1) then
-               call ready( axis, -1, kk )
-               call ready( axis, +1, kk )
+               call ready( axis, -1, u, n1, n2, n3, kk )
+               call ready( axis, +1, u, n1, n2, n3, kk )
    
                call give3( axis, +1, u, n1, n2, n3, kk )
                call give3( axis, -1, u, n1, n2, n3, kk )
@@ -1211,8 +1303,8 @@ c---------------------------------------------------------------------
       do  axis = 1, 3
          if( nprocs .ne. 1 ) then
             if( take_ex( axis, kk ) )then
-               call ready( axis, -1, kk )
-               call ready( axis, +1, kk )
+               call ready( axis, -1, u, n1, n2, n3, kk )
+               call ready( axis, +1, u, n1, n2, n3, kk )
                call take3_ex( axis, -1, u, n1, n2, n3 )
                call take3_ex( axis, +1, u, n1, n2, n3 )
             endif
@@ -1232,7 +1324,7 @@ c---------------------------------------------------------------------
 c---------------------------------------------------------------------
 c---------------------------------------------------------------------
 
-      subroutine ready( axis, dir, k )
+      subroutine ready( axis, dir, u, n1, n2, n3, k )
 
 c---------------------------------------------------------------------
 c---------------------------------------------------------------------
@@ -1245,34 +1337,61 @@ c---------------------------------------------------------------------
       include 'mpinpb.h'
       include 'globals.h'
 
-      integer axis, dir, k
-      integer buff_id,buff_len,i,ierr
-      integer cur_nbr
-
-      buff_id = 3 + dir
-      buff_len = nm2
-
-      do  i=1,nm2
-         buff(i,buff_id) = 0.0D0
-      enddo
-
-!#debug
-!      if (me. eq. root) then
-!      cur_nbr = nbr(axis,-dir,k)
-!      write (*,1) me, axis, dir, buff_len, cur_nbr
-! 1    format('ready: [', i2 , '] axis ', i2 , ', dir ', i2 ,
-!     >   ' irecv len ', i8, ' src ', i2)
-!      endif
-!#debug end
+      integer n1, n2, n3
+      integer axis, dir, k, ierr
+      double precision u( n1, n2, n3 )
+      integer i3, i2, i1, buff_len,buff_id
 
 c---------------------------------------------------------------------
 c     fake message request type
 c---------------------------------------------------------------------
       msg_id(axis,dir,1) = msg_type(axis,dir) +1000*me
 
-      call mpi_irecv( buff(1,buff_id), buff_len,
-     >     dp_type, nbr(axis,-dir,k), msg_type(axis,dir), 
-     >     mpi_comm_world, msg_id(axis,dir,1), ierr)
+      if( axis .eq.  1 )then
+         if( dir .eq. -1 )then
+
+            call mpi_irecv(u(n1,2,2), 1,
+     >          sf_datatype(1, k), nbr(axis,-dir,k), msg_type(axis,dir),
+     >          mpi_comm_world, msg_id(axis,dir,1), ierr)
+
+         else if( dir .eq. +1 ) then
+
+            call mpi_irecv( u(1,2,2), 1,
+     >          sf_datatype(1, k), nbr(axis,-dir,k), msg_type(axis,dir),
+     >          mpi_comm_world, msg_id(axis,dir,1), ierr)
+
+         endif
+      endif
+
+      if( axis .eq.  2 )then
+         if( dir .eq. -1 )then
+
+            call mpi_irecv( u(1,n2,2), 1,
+     >          sf_datatype(2, k), nbr(axis,-dir,k), msg_type(axis,dir),
+     >          mpi_comm_world, msg_id(axis,dir,1), ierr)
+
+         else if( dir .eq. +1 ) then
+
+            call mpi_irecv( u(1,1,2), 1,
+     >          sf_datatype(2, k), nbr(axis,-dir,k), msg_type(axis,dir),
+     >          mpi_comm_world, msg_id(axis,dir,1), ierr)
+         endif
+      endif
+
+      if( axis .eq.  3 )then
+         if( dir .eq. -1 )then
+
+            call mpi_irecv( u(1,1,n3), 1,
+     >          sf_datatype(3, k), nbr(axis,-dir,k), msg_type(axis,dir),
+     >          mpi_comm_world, msg_id(axis,dir,1), ierr)
+         else if( dir .eq. +1 ) then
+
+            call mpi_irecv( u(1,1,1), 1,
+     >          sf_datatype(3, k), nbr(axis,-dir,k), msg_type(axis,dir),
+     >          mpi_comm_world, msg_id(axis,dir,1), ierr)
+         endif
+      endif
+
       return
       end
 
@@ -1303,58 +1422,19 @@ c---------------------------------------------------------------------
       buff_id = 2 + dir 
       buff_len = 0
 
-!#debug
-!      if (me. eq. root) then
-!        write (*,1) me, n1, n2, n3, axis, dir
-! 1      format('give3: [', i2 , '] n1', i5, ' n2 ', i5, ' n3 ', i5
-!     >   , ' axis ', i2, ' dir ', i2)
-!      endif
-!#debug end
-
-!#debug
-! 1    format('give3: [', i2 , '] axis ', i2 , ', dir ', i2 ,
-!     >   ', kk ', k , ' send len ', i8, ' dest ', i2)
-!#debug end
-
       if( axis .eq.  1 )then
          if( dir .eq. -1 )then
 
-            do  i3=2,n3-1
-               do  i2=2,n2-1
-                  buff_len = buff_len + 1
-                  buff(buff_len,buff_id ) = u( 2,  i2,i3)
-               enddo
-            enddo
-!#debug
-!      if (me. eq. root) then
-!        cur_nbr = nbr( axis, dir, k )
-!        write (*,1) me, axis, dir, k, buff_len, cur_nbr
-!      endif
-!#debug end
-
-            call mpi_send( 
-     >           buff(1, buff_id ), buff_len,dp_type,
-     >           nbr( axis, dir, k ), msg_type(axis,dir), 
+            call mpi_send(
+     >           u( 2,  2, 2), 1, sf_datatype(1, k),
+     >           nbr( axis, dir, k ), msg_type(axis,dir),
      >           mpi_comm_world, ierr)
 
          else if( dir .eq. +1 ) then
 
-            do  i3=2,n3-1
-               do  i2=2,n2-1
-                  buff_len = buff_len + 1
-                  buff(buff_len, buff_id ) = u( n1-1, i2,i3)
-               enddo
-            enddo
-!#debug
-!      if (me. eq. root) then
-!        cur_nbr = nbr( axis, dir, k )
-!        write (*,1) me, axis, dir, k, buff_len, cur_nbr
-!      endif
-!#debug end
-
-            call mpi_send( 
-     >           buff(1, buff_id ), buff_len,dp_type,
-     >           nbr( axis, dir, k ), msg_type(axis,dir), 
+            call mpi_send(
+     >            u( n1-1, 2, 2), 1, sf_datatype(1, k),
+     >           nbr( axis, dir, k ), msg_type(axis,dir),
      >           mpi_comm_world, ierr)
 
          endif
@@ -1363,88 +1443,34 @@ c---------------------------------------------------------------------
       if( axis .eq.  2 )then
          if( dir .eq. -1 )then
 
-            do  i3=2,n3-1
-               do  i1=1,n1
-                  buff_len = buff_len + 1
-                  buff(buff_len, buff_id ) = u( i1,  2,i3)
-               enddo
-            enddo
-!#debug
-!      if (me. eq. root) then
-!        cur_nbr = nbr( axis, dir, k )
-!        write (*,1) me, axis, dir, k, buff_len, cur_nbr
-!      endif
-!#debug end
-
-            call mpi_send( 
-     >           buff(1, buff_id ), buff_len,dp_type,
-     >           nbr( axis, dir, k ), msg_type(axis,dir), 
+            call mpi_send(
+     >            u( 1, 2, 2), 1, sf_datatype(2, k),
+     >           nbr( axis, dir, k ), msg_type(axis,dir),
      >           mpi_comm_world, ierr)
 
          else if( dir .eq. +1 ) then
 
-            do  i3=2,n3-1
-               do  i1=1,n1
-                  buff_len = buff_len + 1
-                  buff(buff_len,  buff_id )= u( i1,n2-1,i3)
-               enddo
-            enddo
-!#debug
-!      if (me. eq. root) then
-!        cur_nbr = nbr( axis, dir, k )
-!        write (*,1) me, axis, dir, k, buff_len, cur_nbr
-!      endif
-!#debug end
-
-            call mpi_send( 
-     >           buff(1, buff_id ), buff_len,dp_type,
-     >           nbr( axis, dir, k ), msg_type(axis,dir), 
+            call mpi_send(
+     >            u( 1, n2-1, 2), 1, sf_datatype(2, k),
+     >           nbr( axis, dir, k ), msg_type(axis,dir),
      >           mpi_comm_world, ierr)
-
          endif
       endif
 
       if( axis .eq.  3 )then
          if( dir .eq. -1 )then
 
-            do  i2=1,n2
-               do  i1=1,n1
-                  buff_len = buff_len + 1
-                  buff(buff_len, buff_id ) = u( i1,i2,2)
-               enddo
-            enddo
-!#debug
-!      if (me. eq. root) then
-!        cur_nbr = nbr( axis, dir, k )
-!        write (*,1) me, axis, dir, k, buff_len, cur_nbr
-!      endif
-!#debug end
-
-            call mpi_send( 
-     >           buff(1, buff_id ), buff_len,dp_type,
-     >           nbr( axis, dir, k ), msg_type(axis,dir), 
+            call mpi_send(
+     >            u( 1, 1, 2), 1, sf_datatype(3, k),
+     >           nbr( axis, dir, k ), msg_type(axis,dir),
      >           mpi_comm_world, ierr)
 
          else if( dir .eq. +1 ) then
 
-            do  i2=1,n2
-               do  i1=1,n1
-                  buff_len = buff_len + 1
-                  buff(buff_len, buff_id ) = u( i1,i2,n3-1)
-               enddo
-            enddo
-!#debug
-!      if (me. eq. root) then
-!        cur_nbr = nbr( axis, dir, k )
-!        write (*,1) me, axis, dir, k, buff_len, cur_nbr
-!      endif
-!#debug end
-
-            call mpi_send( 
-     >           buff(1, buff_id ), buff_len,dp_type,
-     >           nbr( axis, dir, k ), msg_type(axis,dir), 
+            call mpi_send(
+     >            u( 1, 1, n3-1), 1, sf_datatype(3, k),
+     >           nbr( axis, dir, k ), msg_type(axis,dir),
      >           mpi_comm_world, ierr)
-
          endif
       endif
 
@@ -1478,74 +1504,6 @@ c---------------------------------------------------------------------
       integer i3, i2, i1
 
       call mpi_wait( msg_id( axis, dir, 1 ),status,ierr)
-      buff_id = 3 + dir
-      indx = 0
-
-      if( axis .eq.  1 )then
-         if( dir .eq. -1 )then
-
-            do  i3=2,n3-1
-               do  i2=2,n2-1
-                  indx = indx + 1
-                  u(n1,i2,i3) = buff(indx, buff_id )
-               enddo
-            enddo
-
-         else if( dir .eq. +1 ) then
-
-            do  i3=2,n3-1
-               do  i2=2,n2-1
-                  indx = indx + 1
-                  u(1,i2,i3) = buff(indx, buff_id )
-               enddo
-            enddo
-
-         endif
-      endif
-
-      if( axis .eq.  2 )then
-         if( dir .eq. -1 )then
-
-            do  i3=2,n3-1
-               do  i1=1,n1
-                  indx = indx + 1
-                  u(i1,n2,i3) = buff(indx, buff_id )
-               enddo
-            enddo
-
-         else if( dir .eq. +1 ) then
-
-            do  i3=2,n3-1
-               do  i1=1,n1
-                  indx = indx + 1
-                  u(i1,1,i3) = buff(indx, buff_id )
-               enddo
-            enddo
-
-         endif
-      endif
-
-      if( axis .eq.  3 )then
-         if( dir .eq. -1 )then
-
-            do  i2=1,n2
-               do  i1=1,n1
-                  indx = indx + 1
-                  u(i1,i2,n3) = buff(indx, buff_id )
-               enddo
-            enddo
-
-         else if( dir .eq. +1 ) then
-
-            do  i2=1,n2
-               do  i1=1,n1
-                  indx = indx + 1
-                  u(i1,i2,1) = buff(indx, buff_id )
-               enddo
-            enddo
-
-         endif
-      endif
 
       return
       end

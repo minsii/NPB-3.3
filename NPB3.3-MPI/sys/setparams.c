@@ -175,6 +175,8 @@ void get_info(int argc, char *argv[], int *typep, int *nprocsp, char *classp,
   else if (!strcmp(argv[1], "hmg") || !strcmp(argv[1], "MG")) *typep = MG;
   else if (!strcmp(argv[1], "hmg-mic") || !strcmp(argv[1], "MG")) *typep = MG;
   else if (!strcmp(argv[1], "mg-mic") || !strcmp(argv[1], "MG")) *typep = MG;
+  else if (!strcmp(argv[1], "ddt-hmg") || !strcmp(argv[1], "MG")) *typep = MG;
+  else if (!strcmp(argv[1], "ddt-hmg-mic") || !strcmp(argv[1], "MG")) *typep = MG;
   else if (!strcmp(argv[1], "is") || !strcmp(argv[1], "IS")) *typep = IS;
   else if (!strcmp(argv[1], "dt") || !strcmp(argv[1], "DT")) *typep = DT;
   else if (!strcmp(argv[1], "ep") || !strcmp(argv[1], "EP")) *typep = EP;

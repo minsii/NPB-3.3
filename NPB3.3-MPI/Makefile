@@ -24,7 +24,6 @@ MG: mg
 mg: header
 	cd MG; $(MAKE) NPROCS=$(NPROCS) CLASS=$(CLASS)
 
-MG: mg
 mg-mic: header
 	cd MG; $(MAKE) NPROCS=$(NPROCS) CLASS=$(CLASS) ARCH=MIC
 	
@@ -32,10 +31,15 @@ HYBRID-MG: hmg
 hmg: header
 	cd HYBRID-MG; $(MAKE) NPROCS=$(NPROCS) CLASS=$(CLASS)
 
-HYBRID-MG: hmg
 hmg-mic: header
 	cd HYBRID-MG; $(MAKE) NPROCS=$(NPROCS) CLASS=$(CLASS) ARCH=MIC
+
+ddt-hmg: header
+	cd HYBRID-MG; $(MAKE) NPROCS=$(NPROCS) CLASS=$(CLASS) USE_DDT=1
 	
+ddt-hmg-mic: header
+	cd HYBRID-MG; $(MAKE) NPROCS=$(NPROCS) CLASS=$(CLASS) USE_DDT=1 ARCH=MIC
+
 FT: ft
 ft: header
 	cd FT; $(MAKE) NPROCS=$(NPROCS) CLASS=$(CLASS)
