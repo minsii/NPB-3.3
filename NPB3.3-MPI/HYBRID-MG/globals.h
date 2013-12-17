@@ -59,6 +59,8 @@ c---------------------------------------------------------------------
       common /mpiddt/ sf_datatype,l1_datatype,sf_size,sizeofdp
       common /mpiddt_ex/ sfex_datatype,sfex_size
 
-
+      integer dbg_timer
+      integer T_comm_ex, T_comm
+      parameter (dbg_timer=1, T_comm_ex=3, T_comm=4)
 
 

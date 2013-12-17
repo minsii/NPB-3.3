@@ -83,6 +83,10 @@ c---------------------------------------------------------------------------c
       parameter (T_bench=1, T_init=2)
       integer tmax, tnum
 
+      double precision tcomm, tcommex, tcomm_init, tcommex_init
+      double precision tcomm_avg, tcommex_avg, tcomm_max, tcommex_max
+      double precision t_avg
+
 !$    integer  omp_get_max_threads, omp_get_num_threads
 !$    external omp_get_max_threads, omp_get_num_threads
 
@@ -108,6 +112,15 @@ c---------------------------------------------------------------------------c
 
       call timer_clear(T_bench)
       call timer_clear(T_init)
+
+      if(dbg_timer.eq.1) then
+        tcomm_init = 0.0
+        tcommex_init = 0.0
+        tcomm = 0.0
+        tcommex = 0.0
+        call timer_clear(T_comm_ex)
+        call timer_clear(T_comm)
+      endif
 
       call mpi_barrier(MPI_COMM_WORLD, ierr)
 
@@ -278,6 +291,21 @@ c---------------------------------------------------------------------
 
       call mpi_barrier(mpi_comm_world,ierr)
 
+      if(dbg_timer.eq.1) then
+        tcomm_init = timer_read(T_comm)
+        tcommex_init = timer_read(T_comm_ex)
+
+        if( me .eq. root )then
+           write(*, 908) tcomm_init
+           write(*, 909) tcommex_init
+908        format(' Comm time in Initialization: ', f15.3, ' seconds')
+909        format(' Commex time in Initialization: ', f15.3, ' seconds')
+        endif
+
+        call timer_clear(T_comm)
+        call timer_clear(T_comm_ex)
+      endif
+
       call timer_start(T_bench)
 
       call resid(u,v,r,n1,n2,n3,a,k)
@@ -303,6 +331,40 @@ c---------------------------------------------------------------------
 
       call mpi_reduce(t0,t,1,dp_type,
      >     mpi_max,root,mpi_comm_world,ierr)
+
+      if(dbg_timer.eq.1) then
+        tcomm = timer_read(T_comm)
+        tcommex = timer_read(T_comm_ex)
+
+        call mpi_reduce(tcomm,tcomm_avg,1,dp_type,
+     >     mpi_sum,root,mpi_comm_world,ierr)
+        call mpi_reduce(tcommex,tcommex_avg,1,dp_type,
+     >     mpi_sum,root,mpi_comm_world,ierr)
+        tcomm_avg = tcomm_avg / nprocs
+        tcommex_avg = tcommex_avg / nprocs
+
+        call mpi_reduce(tcomm,tcomm_max,1,dp_type,
+     >     mpi_max,root,mpi_comm_world,ierr)
+        call mpi_reduce(tcommex,tcommex_max,1,dp_type,
+     >     mpi_max,root,mpi_comm_world,ierr)
+
+        call mpi_reduce(t0,t_avg,1,dp_type,
+     >     mpi_sum,root,mpi_comm_world,ierr)
+        t_avg = t_avg / nprocs
+
+        if( me .eq. root )then
+           write(*, 910) tcomm_avg, tcomm_max
+           write(*, 911) tcommex_avg, tcommex_max
+           write(*, 912) t_avg, t
+910        format(' Comm time (avg max) in seconds: ', 2f15.3)
+911        format(' Commex time (avg max) in seconds: ', 2f15.3)
+912        format(' Time (avg max) in seconds: ', 2f15.3)
+        endif
+
+        call timer_clear(T_comm)
+        call timer_clear(T_comm_ex)
+      endif
+
       verified = .FALSE.
       verify_value = 0.0
       if( me .eq. root )then
@@ -1271,16 +1333,16 @@ c---------------------------------------------------------------------
       include 'mpinpb.h'
       include 'globals.h'
 
+      external timer_read
+      double precision timer_read
+
       integer n1, n2, n3, kk
       double precision u(n1,n2,n3)
       integer axis
 
-!#debug
-!      if (me. eq. root) then
-!        write (*,1) me, n1, n2, n3
-! 1      format('[', i1 , ']comm3: n(',i4, i4, i4, ')')
-!      endif
-!#debug end
+      if(dbg_timer.eq.1) then
+        call timer_start(T_comm)
+      endif
 
       if( .not. dead(kk) )then
          do  axis = 1, 3
@@ -1301,6 +1363,11 @@ c---------------------------------------------------------------------
       else
          call zero3(u,n1,n2,n3)
       endif
+
+      if(dbg_timer.eq.1) then
+        call timer_stop(T_comm)
+      endif
+
       return
       end
 
@@ -1320,16 +1387,16 @@ c---------------------------------------------------------------------
       include 'mpinpb.h'
       include 'globals.h'
 
+      external timer_read
+      double precision timer_read
+
       integer n1, n2, n3, kk
       double precision u(n1,n2,n3)
       integer axis
 
-!#debug
-!      if (me. eq. root) then
-!        write (*,1) me, n1, n2, n3
-! 1      format('[', i1 , ']comm3_ex: n(',i4, i4, i4, ')')
-!      endif
-!#debug end
+      if(dbg_timer.eq.1) then
+        call timer_start(T_comm_ex)
+      endif
 
       do  axis = 1, 3
          if( nprocs .ne. 1 ) then
@@ -1348,6 +1415,10 @@ c---------------------------------------------------------------------
             call comm1p_ex( axis, u, n1, n2, n3, kk )
          endif
       enddo
+
+      if(dbg_timer.eq.1) then
+        call timer_stop(T_comm_ex)
+      endif
 
       return
       end
