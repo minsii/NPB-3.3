@@ -557,9 +557,10 @@ c---------------------------------------------------------------------
       include 'mpinpb.h'
       include 'globals.h'
 
-      integer ierr, k
+      integer ierr, k, ax
 
       do  k = lt,1,-1
+!#### comm3
 !# axis 1 (top, bottom)
 !         vector(cnt:y-2, blen:1, stride:x)
          call mpi_type_vector(m2(k)-2, 1, m1(k), dp_type
@@ -589,16 +590,39 @@ c---------------------------------------------------------------------
          call mpi_type_commit(sf_datatype(3, k), ierr)
          call mpi_type_size(sf_datatype(3, k), sf_size(3, k)
      >    , ierr)
+      enddo
 
-!#debug
-!      if (me. eq. root) then
-!        write (*,1) me, k, m1(k), m2(k), m3(k)
-!1       format('[', i1 , '] --init datatype k:', i1, ' m[ ', 3i4, ']')
-!        write (*,2) me, k, sf_size(1, k), sf_size(2, k), sf_size(3, k)
-!2       format('[', i1 , '] --init datatype k:', i1, ' size[ ', 3i7
-!     >          ,']')
-!      endif
-!#debug end
+!#### comm3_ex
+      do  k = lt,1,-1
+        if (take_ex(1,k).or.give_ex(1,k)) then
+!# axis 1 (top, bottom)
+!         vector(cnt:y*z, blen:1, stride:x)
+             call mpi_type_vector(m2(k) * m3(k), 1, m1(k), dp_type
+     >        , sfex_datatype(1, k), ierr)
+             call mpi_type_commit(sfex_datatype(1, k), ierr)
+             call mpi_type_size(sfex_datatype(1, k), sfex_size(1, k)
+     >        , ierr)
+        endif
+
+!# axis 2 (left, right)
+!        vector(cnt:z, blen:x, stride:x*y)
+        if (take_ex(2,k).or.give_ex(2,k)) then
+             call mpi_type_vector(m3(k), m1(k), m2(k) * m1(k)
+     >       , dp_type , sfex_datatype(2, k), ierr)
+             call mpi_type_commit(sfex_datatype(2, k), ierr)
+             call mpi_type_size(sfex_datatype(2, k), sfex_size(2, k)
+     >        , ierr)
+        endif
+
+!# axis 3 (front, back)
+!         vector(cnt:y, blen:x, stride:x)
+        if (take_ex(3,k).or.give_ex(3,k)) then
+             call mpi_type_vector(m2(k), m1(k), m1(k), dp_type
+     >        , sfex_datatype(3, k), ierr)
+             call mpi_type_commit(sfex_datatype(3, k), ierr)
+             call mpi_type_size(sfex_datatype(3, k), sfex_size(3, k)
+     >        , ierr)
+        endif
       enddo
 
       return
@@ -616,7 +640,7 @@ c---------------------------------------------------------------------
       include 'mpinpb.h'
       include 'globals.h'
 
-      integer ierr, k
+      integer ierr, k, ax
 
       do  k = lt,1,-1
 !#debug
@@ -632,6 +656,13 @@ c---------------------------------------------------------------------
          call mpi_type_free(l1_datatype(k), ierr)
       enddo
 
+      do  k = lt,1,-1
+         do  ax = 1,3
+            if (take_ex(ax,k).or.give_ex(ax,k)) then
+                 call mpi_type_free(sfex_datatype(ax, k), ierr)
+            endif
+        enddo
+      enddo
       return
       end
 
@@ -1303,8 +1334,8 @@ c---------------------------------------------------------------------
       do  axis = 1, 3
          if( nprocs .ne. 1 ) then
             if( take_ex( axis, kk ) )then
-               call ready( axis, -1, u, n1, n2, n3, kk )
-               call ready( axis, +1, u, n1, n2, n3, kk )
+               call ready_ex( axis, -1, u, n1, n2, n3, kk )
+               call ready_ex( axis, +1, u, n1, n2, n3, kk )
                call take3_ex( axis, -1, u, n1, n2, n3 )
                call take3_ex( axis, +1, u, n1, n2, n3 )
             endif
@@ -1511,6 +1542,105 @@ c---------------------------------------------------------------------
 c---------------------------------------------------------------------
 c---------------------------------------------------------------------
 
+      subroutine ready_ex( axis, dir, u, n1, n2, n3, k )
+
+c---------------------------------------------------------------------
+c---------------------------------------------------------------------
+
+c---------------------------------------------------------------------
+c     ready allocates a buffer to take in a message
+c---------------------------------------------------------------------
+      implicit none
+
+      include 'mpinpb.h'
+      include 'globals.h'
+
+      integer axis, dir, k
+      integer buff_id,buff_len,i,ierr
+      integer cur_nbr
+
+      integer n1, n2, n3
+      double precision u( n1, n2, n3 )
+      integer i3, i2, i1
+
+      buff_id = 3 + dir
+      buff_len = nm2
+
+      do  i=1,nm2
+         buff(i,buff_id) = 0.0D0
+      enddo
+
+c---------------------------------------------------------------------
+c     fake message request type
+c---------------------------------------------------------------------
+      msg_id(axis,dir,1) = msg_type(axis,dir) +1000*me
+
+
+      if( axis .eq.  1 )then
+         if( dir .eq. -1 )then
+
+            call mpi_irecv(u(n1,1,1), 1, sfex_datatype(1, k),
+     >          nbr(axis,-dir,k), msg_type(axis,dir),
+     >          mpi_comm_world, msg_id(axis,dir,1), ierr)
+
+         else if( dir .eq. +1 ) then
+
+c        cannot receive once because these 2 surfaces are not contiguous
+            call mpi_irecv( u(1,1,1), 1, sfex_datatype(1, k),
+     >          nbr(axis,-dir,k), msg_type(axis,dir),
+     >          mpi_comm_world, msg_id(axis,dir,1), ierr)
+
+            call mpi_irecv( u(2,1,1), 1, sfex_datatype(1, k),
+     >          nbr(axis,-dir,k), msg_type(axis,dir),
+     >          mpi_comm_world, msg_id(axis,dir,1), ierr)
+
+         endif
+      endif
+
+      if( axis .eq.  2 )then
+         if( dir .eq. -1 )then
+
+            call mpi_irecv( u(1,n2,1), 1, sfex_datatype(2, k),
+     >          nbr(axis,-dir,k), msg_type(axis,dir),
+     >          mpi_comm_world, msg_id(axis,dir,1), ierr)
+
+         else if( dir .eq. +1 ) then
+
+c        cannot receive once because these 2 surfaces are not contiguous
+            call mpi_irecv( u(1,1,1), 2, sfex_datatype(2, k),
+     >          nbr(axis,-dir,k), msg_type(axis,dir),
+     >          mpi_comm_world, msg_id(axis,dir,1), ierr)
+
+            call mpi_irecv( u(1,2,1), 2, sfex_datatype(2, k),
+     >          nbr(axis,-dir,k), msg_type(axis,dir),
+     >          mpi_comm_world, msg_id(axis,dir,1), ierr)
+
+         endif
+      endif
+
+      if( axis .eq.  3 )then
+         if( dir .eq. -1 )then
+
+            call mpi_irecv( u(1,1,n3), 1, sfex_datatype(3, k),
+     >          nbr(axis,-dir,k), msg_type(axis,dir),
+     >          mpi_comm_world, msg_id(axis,dir,1), ierr)
+
+         else if( dir .eq. +1 ) then
+
+            call mpi_irecv( u(1,1,1), 2, sfex_datatype(3, k),
+     >          nbr(axis,-dir,k), msg_type(axis,dir),
+     >          mpi_comm_world, msg_id(axis,dir,1), ierr)
+
+         endif
+      endif
+
+      return
+      end
+
+
+c---------------------------------------------------------------------
+c---------------------------------------------------------------------
+
       subroutine give3_ex( axis, dir, u, n1, n2, n3, k )
 
 c---------------------------------------------------------------------
@@ -1527,6 +1657,10 @@ c---------------------------------------------------------------------
       integer axis, dir, n1, n2, n3, k, ierr
       double precision u( n1, n2, n3 )
 
+      double precision packu( n1, n2, n3 )
+      double precision packbuf(nm2)
+      integer pos
+
       integer i3, i2, i1, buff_len, buff_id
 
       buff_id = 2 + dir 
@@ -1535,32 +1669,21 @@ c---------------------------------------------------------------------
       if( axis .eq.  1 )then
          if( dir .eq. -1 )then
 
-            do  i3=1,n3
-               do  i2=1,n2
-                  buff_len = buff_len + 1
-                  buff(buff_len,buff_id ) = u( 2,  i2,i3)
-               enddo
-            enddo
-
-            call mpi_send( 
-     >           buff(1, buff_id ), buff_len,dp_type,
-     >           nbr( axis, dir, k ), msg_type(axis,dir), 
+            call mpi_send(
+     >           u( 2,  1, 1), 1, sfex_datatype(1, k),
+     >           nbr( axis, dir, k ), msg_type(axis,dir),
      >           mpi_comm_world, ierr)
-
          else if( dir .eq. +1 ) then
 
-            do  i3=1,n3
-               do  i2=1,n2
-                  do  i1=n1-1,n1
-                     buff_len = buff_len + 1
-                     buff(buff_len,buff_id)= u(i1,i2,i3)
-                  enddo
-               enddo
-            enddo
+c        cannot send once because these 2 surfaces are not contiguous
+            call mpi_send(
+     >           u( n1-1,  1, 1), 1, sfex_datatype(1, k),
+     >           nbr( axis, dir, k ), msg_type(axis,dir),
+     >           mpi_comm_world, ierr)
 
-            call mpi_send( 
-     >           buff(1, buff_id ), buff_len,dp_type,
-     >           nbr( axis, dir, k ), msg_type(axis,dir), 
+            call mpi_send(
+     >           u( n1,  1, 1), 1, sfex_datatype(1, k),
+     >           nbr( axis, dir, k ), msg_type(axis,dir),
      >           mpi_comm_world, ierr)
 
          endif
@@ -1569,66 +1692,39 @@ c---------------------------------------------------------------------
       if( axis .eq.  2 )then
          if( dir .eq. -1 )then
 
-            do  i3=1,n3
-               do  i1=1,n1
-                  buff_len = buff_len + 1
-                  buff(buff_len, buff_id ) = u( i1,  2,i3)
-               enddo
-            enddo
-
-            call mpi_send( 
-     >           buff(1, buff_id ), buff_len,dp_type,
-     >           nbr( axis, dir, k ), msg_type(axis,dir), 
+            call mpi_send(
+     >           u( 1,  2, 1), 1, sfex_datatype(2, k),
+     >           nbr( axis, dir, k ), msg_type(axis,dir),
      >           mpi_comm_world, ierr)
 
          else if( dir .eq. +1 ) then
 
-            do  i3=1,n3
-               do  i2=n2-1,n2
-                  do  i1=1,n1
-                     buff_len = buff_len + 1
-                     buff(buff_len,buff_id )= u(i1,i2,i3)
-                  enddo
-               enddo
-            enddo
-
-            call mpi_send( 
-     >           buff(1, buff_id ), buff_len,dp_type,
-     >           nbr( axis, dir, k ), msg_type(axis,dir), 
+c        cannot send once because these 2 surfaces are not contiguous
+            call mpi_send(
+     >           u(1, n2-1, 1), 1, sfex_datatype(2, k),
+     >           nbr( axis, dir, k ), msg_type(axis,dir),
      >           mpi_comm_world, ierr)
 
+            call mpi_send(
+     >           u(1, n2, 1), 1, sfex_datatype(2, k),
+     >           nbr( axis, dir, k ), msg_type(axis,dir),
+     >           mpi_comm_world, ierr)
          endif
       endif
 
       if( axis .eq.  3 )then
          if( dir .eq. -1 )then
 
-            do  i2=1,n2
-               do  i1=1,n1
-                  buff_len = buff_len + 1
-                  buff(buff_len, buff_id ) = u( i1,i2,2)
-               enddo
-            enddo
-
-            call mpi_send( 
-     >           buff(1, buff_id ), buff_len,dp_type,
-     >           nbr( axis, dir, k ), msg_type(axis,dir), 
+            call mpi_send(
+     >           u( 1,  1, 2), 1, sfex_datatype(3, k),
+     >           nbr( axis, dir, k ), msg_type(axis,dir),
      >           mpi_comm_world, ierr)
 
          else if( dir .eq. +1 ) then
 
-            do  i3=n3-1,n3
-               do  i2=1,n2
-                  do  i1=1,n1
-                     buff_len = buff_len + 1
-                     buff(buff_len, buff_id ) = u( i1,i2,i3)
-                  enddo
-               enddo
-            enddo
-
-            call mpi_send( 
-     >           buff(1, buff_id ), buff_len,dp_type,
-     >           nbr( axis, dir, k ), msg_type(axis,dir), 
+            call mpi_send(
+     >           u(1,  1, n3-1), 2, sfex_datatype(3, k),
+     >           nbr( axis, dir, k ), msg_type(axis,dir),
      >           mpi_comm_world, ierr)
 
          endif
@@ -1663,80 +1759,6 @@ c---------------------------------------------------------------------
       integer i3, i2, i1
 
       call mpi_wait( msg_id( axis, dir, 1 ),status,ierr)
-      buff_id = 3 + dir
-      indx = 0
-
-      if( axis .eq.  1 )then
-         if( dir .eq. -1 )then
-
-            do  i3=1,n3
-               do  i2=1,n2
-                  indx = indx + 1
-                  u(n1,i2,i3) = buff(indx, buff_id )
-               enddo
-            enddo
-
-         else if( dir .eq. +1 ) then
-
-            do  i3=1,n3
-               do  i2=1,n2
-                  do  i1=1,2
-                     indx = indx + 1
-                     u(i1,i2,i3) = buff(indx,buff_id)
-                  enddo
-               enddo
-            enddo
-
-         endif
-      endif
-
-      if( axis .eq.  2 )then
-         if( dir .eq. -1 )then
-
-            do  i3=1,n3
-               do  i1=1,n1
-                  indx = indx + 1
-                  u(i1,n2,i3) = buff(indx, buff_id )
-               enddo
-            enddo
-
-         else if( dir .eq. +1 ) then
-
-            do  i3=1,n3
-               do  i2=1,2
-                  do  i1=1,n1
-                     indx = indx + 1
-                     u(i1,i2,i3) = buff(indx,buff_id)
-                  enddo
-               enddo
-            enddo
-
-         endif
-      endif
-
-      if( axis .eq.  3 )then
-         if( dir .eq. -1 )then
-
-            do  i2=1,n2
-               do  i1=1,n1
-                  indx = indx + 1
-                  u(i1,i2,n3) = buff(indx, buff_id )
-               enddo
-            enddo
-
-         else if( dir .eq. +1 ) then
-
-            do  i3=1,2
-               do  i2=1,n2
-                  do  i1=1,n1
-                     indx = indx + 1
-                     u(i1,i2,i3) = buff(indx,buff_id)
-                  enddo
-               enddo
-            enddo
-
-         endif
-      endif
 
       return
       end

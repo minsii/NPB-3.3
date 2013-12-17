@@ -54,8 +54,10 @@ c---------------------------------------------------------------------
 c  Datatype stuff
 c---------------------------------------------------------------------
       integer sf_datatype(3, maxlevel), l1_datatype(maxlevel)
-      integer sf_size(3, maxlevel), sizeofdp
-      common /mpiddt/ sf_datatype, l1_datatype, sf_size, sizeofdp
+      integer sfex_datatype(3, maxlevel), sf_size(3, maxlevel)
+      integer sfex_size(3, maxlevel), sizeofdp
+      common /mpiddt/ sf_datatype,l1_datatype,sf_size,sizeofdp
+      common /mpiddt_ex/ sfex_datatype,sfex_size
 
 
 
