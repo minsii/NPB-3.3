@@ -906,6 +906,7 @@ c---------------------------------------------------------------------
       integer i3, i2, i1
       double precision u1(m), u2(m)
 
+!$omp parallel do default(shared) private(i1,i2,i3,u1,u2)
       do i3=2,n3-1
          do i2=2,n2-1
             do i1=1,n1
