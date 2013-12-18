@@ -468,10 +468,10 @@ c---------------------------------------------------------------------
          m2(k) = mi(2,k)
          m3(k) = mi(3,k)
 !#debug
-      if (me. eq. root) then
-        write (*,1) me, k, m1(k), m2(k), m3(k)
- 1      format('[', i1 , '] k ', i2, ', m[ ', i4, i4, i4, ']')
-      endif
+!      if (me. eq. root) then
+!        write (*,1) me, k, m1(k), m2(k), m3(k)
+! 1      format('[', i1 , '] k ', i2, ', m[ ', i4, i4, i4, ']')
+!      endif
 !#debug end
 
          do  ax=1,3
@@ -723,6 +723,7 @@ c---------------------------------------------------------------------
       integer i3, i2, i1
       double precision u1(m), u2(m)
 
+!$omp parallel do default(shared) private(i1,i2,i3,u1,u2)
       do i3=2,n3-1
          do i2=2,n2-1
             do i1=1,n1
@@ -2377,8 +2378,8 @@ c 7    format(10i4)
 
 !#debug
 !      if (me. eq. root) then
-!        write (*,1) me
-! 1      format('[', i1 , '] zran3')
+!        write (*,1) me, k, n1, n2, n3
+! 1      format('[', i1 , '] --zran3 k ', i1, ' n(',i4, i4, i4, ')')
 !      endif
 !#debug end
       call comm3(z,n1,n2,n3,k)
