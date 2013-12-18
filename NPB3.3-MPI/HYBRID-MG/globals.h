@@ -61,6 +61,6 @@ c---------------------------------------------------------------------
 
       integer dbg_timer
       integer T_comm_ex, T_comm
-      parameter (dbg_timer=1, T_comm_ex=3, T_comm=4)
-
+      parameter (T_comm_ex=3, T_comm=4)
+      common /mpiddt_dbg/ dbg_timer
 

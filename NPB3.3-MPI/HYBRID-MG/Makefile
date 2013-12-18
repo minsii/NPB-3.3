@@ -17,27 +17,31 @@ endif
 ifeq ($(USE_DDT), 1)
 BENCHMARK=ddt-$(_BENCHMARK)
 BENCHMARKU=DDT-$(_BENCHMARK)
-OBJS = ddt-hmg.o
+MG_OBJS = ddt-hmg.o
 else
 BENCHMARK=$(_BENCHMARK)
 BENCHMARKU=$(_BENCHMARK)
-OBJS = hmg.o
+MG_OBJS = hmg.o
 endif
 
-OBJS += ${COMMON}/omp_print_results.o  \
+COMM_OBJS += ${COMMON}/omp_print_results.o  \
        ${COMMON}/${RAND}.o ${COMMON}/timers.o
 
 include ../sys/make.common
 
-${PROGRAM}: config ${OBJS}
+${PROGRAM}: config $(MG_OBJS) ${COMM_OBJS} ddt-hmg-timer.o
 	mkdir -p $(dir $@)
-	${FLINK} ${FLINKFLAGS} -o ${PROGRAM} ${OBJS} ${FMPI_LIB}
+	${FLINK} ${FLINKFLAGS} -o ${PROGRAM} $(MG_OBJS) ${COMM_OBJS} ${FMPI_LIB}
+	${FLINK} ${FLINKFLAGS} -o ${PROGRAM}.timer ddt-hmg-timer.o ${COMM_OBJS} ${FMPI_LIB}
 
 hmg.o:		hmg.f  globals.h mpinpb.h npbparams.h
 	${FCOMPILE} -o $@ hmg.f
 
 ddt-hmg.o:	ddt-hmg.f  globals.h mpinpb.h npbparams.h
 	${FCOMPILE} -o $@ ddt-hmg.f
+
+ddt-hmg-timer.o:	ddt-hmg-timer.f  globals.h mpinpb.h npbparams.h
+	${FCOMPILE} -o $@ ddt-hmg-timer.f
 	
 clean:
 	- rm -f *.o *~ 

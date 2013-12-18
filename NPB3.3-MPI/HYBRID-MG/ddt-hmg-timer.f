@@ -90,7 +90,7 @@ c---------------------------------------------------------------------------c
 !$    integer  omp_get_max_threads, omp_get_num_threads
 !$    external omp_get_max_threads, omp_get_num_threads
 
-      dbg_timer = 0
+      dbg_timer = 1
 
       call mpi_init(ierr)
       call mpi_comm_rank(mpi_comm_world, me, ierr)
@@ -307,6 +307,8 @@ c---------------------------------------------------------------------
         call timer_clear(T_comm)
         call timer_clear(T_comm_ex)
       endif
+
+!      nit = 0
 
       call timer_start(T_bench)
 
@@ -1607,7 +1609,9 @@ c---------------------------------------------------------------------
 
       integer i3, i2, i1
 
-      call mpi_wait( msg_id( axis, dir, 1 ),status,ierr)
+!      if( axis .eq.  2 )then
+        call mpi_wait( msg_id( axis, dir, 1 ),status,ierr)
+!      endif
 
       return
       end
