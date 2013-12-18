@@ -60,7 +60,8 @@ c---------------------------------------------------------------------
       common /mpiddt_ex/ sfex_datatype,sfex_size
 
       integer dbg_timer
-      integer T_comm_ex, T_comm
+      integer T_comm_ex, T_comm, T_comm_a1, T_comm_a2, T_comm_a3
       parameter (T_comm_ex=3, T_comm=4)
+      parameter (T_comm_a1=5, T_comm_a2=6, T_comm_a3=7)
       common /mpiddt_dbg/ dbg_timer
 
