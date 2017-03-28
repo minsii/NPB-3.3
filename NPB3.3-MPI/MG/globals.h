@@ -50,6 +50,19 @@ c      parameter( m=1037 )
       double precision buff(nm2,4)
       common /buffer/ buff
 
+c---------------------------------------------------------------------
+c  Datatype stuff
+c---------------------------------------------------------------------
+      integer sf_datatype(3, maxlevel), l1_datatype(maxlevel)
+      integer sfex_datatype(3, maxlevel), sf_size(3, maxlevel)
+      integer sfex_size(3, maxlevel), sizeofdp
+      common /mpiddt/ sf_datatype,l1_datatype,sf_size,sizeofdp
+      common /mpiddt_ex/ sfex_datatype,sfex_size
 
+      integer dbg_timer
+      integer T_comm_ex, T_comm, T_comm_a1, T_comm_a2, T_comm_a3
+      parameter (T_comm_ex=3, T_comm=4)
+      parameter (T_comm_a1=5, T_comm_a2=6, T_comm_a3=7)
+      common /mpiddt_dbg/ dbg_timer
 
 
